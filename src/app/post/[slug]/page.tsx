@@ -1,8 +1,20 @@
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 
-export default async function PostPage({ params }: { params: { slug: string } }) {
-  const post = await prisma.post.findUnique({ where: { slug: params.slug } })
+// (opcional pero recomendado si lees DB en cada request)
+export const dynamic = "force-dynamic"
+
+export default async function PostPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}) {
+  const { slug } = await params
+
+  const post = await prisma.post.findUnique({
+    where: { slug },
+  })
+
   if (!post || !post.published) return notFound()
 
   return (

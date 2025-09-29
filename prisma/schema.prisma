@@ -8,24 +8,27 @@ datasource db {
 }
 
 model User {
-  id        String  @id @default(cuid())
-  email     String  @unique
+  id        String   @id @default(cuid())
+  email     String   @unique
   name      String?
   posts     Post[]
   createdAt DateTime @default(now())
 }
 
 model Post {
-  id        String   @id @default(cuid())
-  title     String
-  slug      String   @unique
-  content   String
-  published Boolean  @default(false)
-  author    User?    @relation(fields: [authorId], references: [id])
-  authorId  String?
-  tags      TagOnPost[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String    @id @default(cuid())
+  title       String
+  slug        String    @unique
+  excerpt     String?   // preview corto
+  contentMd   String    // ahora guardamos Markdown
+  coverImage  String?   // URL de imagen
+  published   Boolean   @default(false)
+  publishedAt DateTime? // fecha de publicación
+  author      User?     @relation(fields: [authorId], references: [id])
+  authorId    String?
+  tags        TagOnPost[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }
 
 model Tag {
@@ -37,9 +40,7 @@ model Tag {
 model TagOnPost {
   postId String
   tagId  String
-
   post Post @relation(fields: [postId], references: [id])
   tag  Tag  @relation(fields: [tagId], references: [id])
-
   @@id([postId, tagId])
 }
