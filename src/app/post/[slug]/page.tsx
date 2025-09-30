@@ -2,6 +2,8 @@ import Link from "next/link";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
+import { Prisma } from "@prisma/client";
+
 import { markdownToHtml } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { commentTokenCookie, postTokenCookie } from "@/lib/tokens";
@@ -73,7 +75,7 @@ export default async function PostPage({
 }) {
   const { slug } = await params;
   const databaseConfigured = Boolean(process.env.DATABASE_URL);
-  let loadError = false;
+  let loadErrorMessage: string | null = null;
 
   let post: PostWithTags | null = null;
 
@@ -102,7 +104,12 @@ export default async function PostPage({
       })) as PostWithTags | null;
     } catch (error) {
       console.error("No se pudo leer la base de datos", error);
-      loadError = true;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
+        loadErrorMessage =
+          'Actualiza tu base de datos ejecutando "npx prisma migrate deploy" para aplicar los cambios más recientes.';
+      } else {
+        loadErrorMessage = "No se pudo conectar con la base de datos en este momento.";
+      }
     }
   }
 
@@ -129,13 +136,16 @@ export default async function PostPage({
               className="prose prose-invert mt-10 max-w-none prose-headings:text-white prose-strong:text-white"
               dangerouslySetInnerHTML={{ __html: contentHtml }}
             />
-            <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+            <FallbackFooter
+              databaseConfigured={databaseConfigured}
+              loadErrorMessage={loadErrorMessage}
+            />
           </div>
         </main>
       );
     }
 
-    if (databaseConfigured && !loadError) {
+    if (databaseConfigured && !loadErrorMessage) {
       return notFound();
     }
   }
@@ -198,13 +208,20 @@ export default async function PostPage({
             tags={tagNames.join(", ")}
           />
         ) : null}
-        {databaseConfigured && !loadError ? (
+        {databaseConfigured && !loadErrorMessage ? (
           <>
             <CommentsSection slug={post.slug} comments={comments} />
-            <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+            <FallbackFooter
+              databaseConfigured={databaseConfigured}
+              loadErrorMessage={loadErrorMessage}
+            />
           </>
         ) : (
-          <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+          <FallbackFooter
+            databaseConfigured={databaseConfigured}
+            loadErrorMessage={loadErrorMessage}
+          />
+
         )}
       </div>
     </main>
@@ -213,10 +230,10 @@ export default async function PostPage({
 
 function FallbackFooter({
   databaseConfigured,
-  loadError,
+  loadErrorMessage,
 }: {
   databaseConfigured: boolean;
-  loadError: boolean;
+  loadErrorMessage: string | null;
 }) {
   return (
     <div className="mt-12 flex flex-wrap justify-between gap-3 text-sm text-white/70">
@@ -226,9 +243,13 @@ function FallbackFooter({
       <span>
         ¿Viste algo que debamos moderar? Escríbenos a <a className="underline" href="mailto:moderacion@example.com">moderacion@example.com</a>
       </span>
-      {(!databaseConfigured || loadError) && (
+      {(!databaseConfigured || loadErrorMessage) && (
         <span className="basis-full text-xs text-amber-200/80">
-          Conecta la variable <code>DATABASE_URL</code> para ver publicaciones reales.
+          {loadErrorMessage ?? (
+            <>
+              Conecta la variable <code>DATABASE_URL</code> para ver publicaciones reales.
+            </>
+          )}
         </span>
       )}
     </div>
