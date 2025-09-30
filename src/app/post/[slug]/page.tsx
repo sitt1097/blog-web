@@ -1,8 +1,13 @@
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 
 import { markdownToHtml } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
+import { commentTokenCookie, postTokenCookie } from "@/lib/tokens";
+
+import { CommentsSection, type CommentNode } from "./comments";
+import { PostOwnerPanel } from "./post-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +42,17 @@ const fallbackPosts: Record<
   },
 };
 
+type CommentWithChildren = {
+  id: string;
+  contentMd: string;
+  createdAt: Date;
+  updatedAt: Date;
+  authorAlias: string | null;
+  authorToken: string | null;
+  parentId: string | null;
+  replies: CommentWithChildren[];
+};
+
 type PostWithTags = {
   title: string;
   slug: string;
@@ -45,7 +61,9 @@ type PostWithTags = {
   publishedAt: Date | null;
   createdAt: Date;
   authorAlias: string | null;
+  authorToken: string | null;
   tags: { tag: { name: string } }[];
+  comments: CommentWithChildren[];
 };
 
 export default async function PostPage({
@@ -68,6 +86,15 @@ export default async function PostPage({
             include: {
               tag: {
                 select: { name: true },
+              },
+            },
+          },
+          comments: {
+            where: { parentId: null },
+            orderBy: { createdAt: "asc" },
+            include: {
+              replies: {
+                orderBy: { createdAt: "asc" },
               },
             },
           },
@@ -120,6 +147,26 @@ export default async function PostPage({
   const publishedAt = post.publishedAt ?? post.createdAt;
   const contentHtml = markdownToHtml(post.contentMd);
   const tagNames = post.tags.map(({ tag }) => tag.name);
+  const cookieStore = await cookies();
+  const canManagePost = Boolean(
+    post.authorToken && cookieStore.get(postTokenCookie(slug))?.value === post.authorToken,
+  );
+
+  const mapComment = (comment: CommentWithChildren): CommentNode => ({
+    id: comment.id,
+    contentHtml: markdownToHtml(comment.contentMd),
+    contentMd: comment.contentMd,
+    authorAlias: comment.authorAlias,
+    createdAtIso: comment.createdAt.toISOString(),
+    createdAtLabel: dateFormatter.format(comment.createdAt),
+    wasEdited: comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000,
+    canEdit: Boolean(
+      comment.authorToken && cookieStore.get(commentTokenCookie(comment.id))?.value === comment.authorToken,
+    ),
+    replies: comment.replies.map(mapComment),
+  });
+
+  const comments = post.comments.map(mapComment);
 
   return (
     <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.3),_transparent_65%)] py-16 text-white">
@@ -142,7 +189,23 @@ export default async function PostPage({
           className="prose prose-invert mt-10 max-w-none prose-headings:text-white prose-strong:text-white"
           dangerouslySetInnerHTML={{ __html: contentHtml }}
         />
-        <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+        {canManagePost ? (
+          <PostOwnerPanel
+            slug={post.slug}
+            title={post.title}
+            content={post.contentMd}
+            alias={post.authorAlias ?? ""}
+            tags={tagNames.join(", ")}
+          />
+        ) : null}
+        {databaseConfigured && !loadError ? (
+          <>
+            <CommentsSection slug={post.slug} comments={comments} />
+            <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+          </>
+        ) : (
+          <FallbackFooter databaseConfigured={databaseConfigured} loadError={loadError} />
+        )}
       </div>
     </main>
   );
