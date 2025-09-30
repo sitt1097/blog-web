@@ -96,6 +96,7 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
   const safePage = Math.min(page, totalPages);
   const baseParams = buildBaseParams({ query, tag, sort });
 
+
   return (
     <main className="relative min-h-screen overflow-hidden bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 text-white">
       <div
@@ -175,12 +176,19 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
           <header className="flex flex-col gap-4 rounded-3xl border border-white/15 bg-white/5 p-6 shadow-lg shadow-black/20">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
+
                 <h2 className="font-heading text-3xl text-white">Historias de la comunidad</h2>
                 <p className="mt-1 text-sm text-white/70">
                   {data.databaseConfigured && !data.loadErrorMessage
+
                     ? "Lee lo que otras personas están compartiendo ahora mismo."
                     : "Mostramos ejemplos porque la base de datos aún no está configurada."}
                 </p>
+                {loadErrorMessage ? (
+                  <p className="mt-2 rounded-lg border border-amber-300/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                    {loadErrorMessage}
+                  </p>
+                ) : null}
               </div>
               <div className="flex items-center gap-2 text-xs text-white/70">
                 <SortToggle label="Más recientes" value="latest" current={sort} baseParams={baseParams} />

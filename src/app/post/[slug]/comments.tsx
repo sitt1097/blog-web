@@ -1,6 +1,8 @@
 "use client";
 
+
 import { useEffect, useMemo, useState, useTransition } from "react";
+
 import { useFormState, useFormStatus } from "react-dom";
 
 import {
@@ -11,6 +13,7 @@ import {
   type CommentFormState,
   updateComment,
 } from "@/app/actions";
+
 import { reactionOptions, type ReactionCountRecord, type ReactionId } from "@/lib/reactions";
 
 export type CommentNode = {
@@ -22,6 +25,7 @@ export type CommentNode = {
   createdAtLabel: string;
   wasEdited: boolean;
   canEdit: boolean;
+
   ownedByViewer: boolean;
   replyingToOwner: boolean;
   parentId: string | null;
@@ -56,11 +60,13 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
 
+
   useEffect(() => {
     if (formState?.message) {
       setHasSubmitted(prev => !prev);
     }
   }, [formState?.message]);
+
 
   const sortedComments = useMemo(() => sortCommentTree(comments, sortMode), [comments, sortMode]);
 
@@ -153,6 +159,7 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
               className="text-xs font-semibold uppercase tracking-widest text-indigo-200/80"
             >
               Mensaje
+
             </label>
             <textarea
               id="new-comment"
@@ -160,6 +167,7 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
               required
               minLength={4}
               rows={4}
+
               className="mt-3 w-full rounded-2xl border border-white/30 bg-white/90 px-5 py-4 text-base text-slate-900 shadow-inner shadow-indigo-900/20 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
               placeholder="Escribe tu respuesta aquí..."
             />
@@ -169,25 +177,31 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
               htmlFor="new-comment-alias"
               className="text-xs font-semibold uppercase tracking-widest text-indigo-200/80"
             >
+
               Alias (opcional)
             </label>
             <input
               id="new-comment-alias"
               name="alias"
               maxLength={40}
+
               className="mt-3 w-full rounded-2xl border border-white/30 bg-white/80 px-4 py-3 text-base text-slate-900 shadow-inner shadow-indigo-900/10 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"
+
               placeholder="Anónima, Compañero solidario..."
             />
           </div>
         </div>
         {formState?.errors?.length ? (
+
           <ul className="mt-6 list-disc space-y-2 rounded-2xl border border-red-200/40 bg-red-500/10 p-4 text-xs text-red-100">
+
             {formState.errors.map(error => (
               <li key={error}>{error}</li>
             ))}
           </ul>
         ) : null}
         {formState?.message ? (
+
           <p className="mt-6 rounded-2xl border border-emerald-200/40 bg-emerald-500/10 px-4 py-3 text-xs text-emerald-100">
             {formState.message}
           </p>
@@ -199,17 +213,21 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
           </span>
         </div>
       </form>
+
     </section>
   );
 }
 
+
 function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) {
+
   const [showReply, setShowReply] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [deleteState, deleteAction] = useFormState(deleteComment, initialDeleteState);
 
   useEffect(() => {
     if (deleteState?.message) {
+
       setShowReply(false);
       setShowEdit(false);
     }
@@ -230,13 +248,16 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
       />
       <div className="mt-5 flex flex-wrap items-center gap-3 text-xs text-white/70">
         <ReactionToggles commentId={comment.id} initialState={comment.reactions} />
+
         <button
           type="button"
           onClick={() => {
             setShowReply(prev => !prev);
             setShowEdit(false);
           }}
+
           className="rounded-full bg-indigo-500/20 px-3 py-1 font-medium text-indigo-100 transition hover:bg-indigo-500/30"
+
         >
           {showReply ? "Cancelar" : "Responder"}
         </button>
@@ -247,7 +268,9 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
               setShowEdit(prev => !prev);
               setShowReply(false);
             }}
+
             className="rounded-full bg-indigo-500/20 px-3 py-1 font-medium text-indigo-100 transition hover:bg-indigo-500/30"
+
           >
             {showEdit ? "Cerrar edición" : "Editar"}
           </button>
@@ -263,7 +286,9 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
           </form>
         ) : null}
       </div>
+
       {showReply ? <ReplyForm slug={slug} parentId={comment.id} onClose={() => setShowReply(false)} /> : null}
+
       {showEdit ? (
         <EditCommentForm
           slug={slug}
@@ -272,6 +297,7 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
           initialAlias={comment.authorAlias ?? ""}
         />
       ) : null}
+
       {comment.replies.length ? (
         <ol className="mt-6 space-y-6 border-l border-white/10 pl-6">
           {comment.replies.map(child => (
@@ -279,9 +305,11 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
           ))}
         </ol>
       ) : null}
+
     </li>
   );
 }
+
 
 function ReactionToggles({
   commentId,
@@ -352,14 +380,17 @@ function ReactionToggles({
   );
 }
 
+
 function ReplyForm({ slug, parentId, onClose }: { slug: string; parentId: string; onClose: () => void }) {
   const [state, action] = useFormState(createComment, initialCommentState);
   const [nonce, setNonce] = useState(0);
 
   useEffect(() => {
     if (state?.message) {
+
       setNonce(prev => prev + 1);
       onClose();
+
     }
   }, [state?.message, onClose]);
 
@@ -367,6 +398,7 @@ function ReplyForm({ slug, parentId, onClose }: { slug: string; parentId: string
     <form
       key={nonce}
       action={action}
+
       className="mt-6 rounded-2xl border border-indigo-300/30 bg-indigo-900/40 p-5 text-sm text-white shadow-inner"
     >
       <input type="hidden" name="slug" value={slug} />
@@ -404,22 +436,27 @@ function ReplyForm({ slug, parentId, onClose }: { slug: string; parentId: string
       </div>
       {state?.errors?.length ? (
         <ul className="mt-4 list-disc space-y-1 rounded-2xl border border-red-200/40 bg-red-500/10 p-3 text-xs text-red-100">
+
           {state.errors.map(error => (
             <li key={error}>{error}</li>
           ))}
         </ul>
       ) : null}
+
       {state?.message ? (
         <p className="mt-4 rounded-2xl border border-emerald-200/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
           {state.message}
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-indigo-100/80">
+
         <SubmitButton label="Responder" pendingLabel="Enviando..." />
         <button
           type="button"
           onClick={onClose}
+
           className="rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-white/70 transition hover:border-white/40 hover:text-white"
+
         >
           Cancelar
         </button>
@@ -444,7 +481,9 @@ function EditCommentForm({
 
   useEffect(() => {
     if (state?.message) {
+
       setNonce(prev => prev + 1);
+
     }
   }, [state?.message]);
 
@@ -452,6 +491,7 @@ function EditCommentForm({
     <form
       key={nonce}
       action={action}
+
       className="mt-6 rounded-2xl border border-indigo-300/40 bg-indigo-900/40 p-5 text-sm text-white shadow-inner"
     >
       <input type="hidden" name="slug" value={slug} />
@@ -489,42 +529,51 @@ function EditCommentForm({
       </div>
       {state?.errors?.length ? (
         <ul className="mt-4 list-disc space-y-1 rounded-2xl border border-red-200/40 bg-red-500/10 p-3 text-xs text-red-100">
+
           {state.errors.map(error => (
             <li key={error}>{error}</li>
           ))}
         </ul>
       ) : null}
       {state?.message ? (
+
         <p className="mt-4 rounded-2xl border border-emerald-200/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
           {state.message}
         </p>
       ) : null}
       <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-indigo-100/80">
         <SubmitButton label="Guardar cambios" pendingLabel="Actualizando..." />
+
       </div>
     </form>
   );
 }
 
+
 function DeleteButton() {
+
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
+
       className="rounded-full border border-red-300/40 bg-red-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-widest text-red-100 transition hover:border-red-300 hover:bg-red-500/20 focus:outline-none focus:ring-2 focus:ring-red-300 disabled:opacity-60"
     >
       {pending ? "Eliminando..." : "Eliminar"}
+
     </button>
   );
 }
 
 function SubmitButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+
   const { pending } = useFormStatus();
   return (
     <button
       type="submit"
       disabled={pending}
+
       className="rounded-full bg-indigo-500 px-6 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-white shadow-lg shadow-indigo-500/40 transition hover:bg-indigo-400 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-indigo-600 disabled:opacity-70"
     >
       {pending ? pendingLabel : label}
@@ -609,3 +658,4 @@ function reactionKey(reaction: ReactionId): keyof ReactionCountRecord {
       return "reactionClap";
   }
 }
+

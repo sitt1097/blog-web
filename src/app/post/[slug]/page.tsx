@@ -6,12 +6,14 @@ import { Prisma } from "@prisma/client";
 
 import { markdownToHtml } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
+
 import { commentReactionCookie, commentTokenCookie, postReactionCookie, postTokenCookie } from "@/lib/tokens";
 import { reactionsFromCookie, totalReactions } from "@/lib/reactions";
 
 import { CommentsSection, type CommentNode } from "./comments";
 import { PostOwnerPanel } from "./post-editor";
 import { ReactionBar } from "./reaction-bar";
+
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +48,17 @@ const fallbackPosts: Record<
   },
 };
 
+type CommentWithChildren = {
+  id: string;
+  contentMd: string;
+  createdAt: Date;
+  updatedAt: Date;
+  authorAlias: string | null;
+  authorToken: string | null;
+  parentId: string | null;
+  replies: CommentWithChildren[];
+};
+
 type PostWithTags = {
   id: string;
   title: string;
@@ -57,10 +70,12 @@ type PostWithTags = {
   authorAlias: string | null;
   authorToken: string | null;
   tags: { tag: { name: string } }[];
+
   reactionThumbsUp: number;
   reactionHeart: number;
   reactionHope: number;
   reactionClap: number;
+
 };
 
 type CommentRecord = Prisma.CommentGetPayload<{
@@ -72,10 +87,12 @@ type CommentRecord = Prisma.CommentGetPayload<{
     authorAlias: true;
     authorToken: true;
     parentId: true;
+
     reactionThumbsUp: true;
     reactionHeart: true;
     reactionHope: true;
     reactionClap: true;
+
   };
 }>;
 
@@ -104,6 +121,15 @@ export default async function PostPage({
             include: {
               tag: {
                 select: { name: true },
+              },
+            },
+          },
+          comments: {
+            where: { parentId: null },
+            orderBy: { createdAt: "asc" },
+            include: {
+              replies: {
+                orderBy: { createdAt: "asc" },
               },
             },
           },
@@ -208,6 +234,7 @@ export default async function PostPage({
     post.authorToken && cookieStore.get(postTokenCookie(slug))?.value === post.authorToken,
   );
 
+
   const mapComment = (
     comment: CommentWithChildren,
     depth: number,
@@ -260,6 +287,7 @@ export default async function PostPage({
   };
 
   const viewerPostReactions = reactionsFromCookie(cookieStore.get(postReactionCookie(post.slug))?.value);
+
 
   return (
     <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.35),_transparent_70%)] py-16 text-white">
@@ -314,6 +342,8 @@ export default async function PostPage({
           databaseConfigured={databaseConfigured}
           loadErrorMessage={loadErrorMessage}
         />
+
+
       </div>
     </main>
   );
