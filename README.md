@@ -2,7 +2,21 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Getting Started
 
-First, run the development server:
+First, make sure your database schema is up to date:
+
+```bash
+npx prisma migrate deploy
+```
+
+The project now regenerates the Prisma client automatically before the
+`dev`, `build`, and `start` scripts. If you prefer to run it manually you
+can execute:
+
+```bash
+npx prisma generate
+```
+
+Then run the development server:
 
 ```bash
 npm run dev
