@@ -13,3 +13,7 @@ export function postReactionCookie(slug: string) {
 export function commentReactionCookie(id: string) {
   return `comment-reactions-${id}`;
 }
+
+export function adminTokenCookie() {
+  return "va-admin-token";
+}

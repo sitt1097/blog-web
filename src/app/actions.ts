@@ -11,11 +11,13 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { excerptFromMarkdown, slugify } from "@/lib/posts";
 import {
+  adminTokenCookie,
   commentReactionCookie,
   commentTokenCookie,
   postReactionCookie,
   postTokenCookie,
 } from "@/lib/tokens";
+import { hashModerationSecret, isAdminTokenValid, moderationSecretHash } from "@/lib/admin";
 
 const reactionTypes = ["thumbsUp", "heart", "hope", "clap"] as const;
 type ReactionType = (typeof reactionTypes)[number];
@@ -109,6 +111,57 @@ export type ActionResult = {
   message?: string;
   error?: string;
 };
+
+export async function authenticateAdmin(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  void _prevState;
+  const providedSecret = (formData.get("secret") ?? "").toString();
+  const expectedHash = moderationSecretHash();
+
+  if (!expectedHash) {
+    return {
+      error:
+        "La moderación no está configurada. Define la variable de entorno MODERATION_SECRET para habilitar esta función.",
+    };
+  }
+
+  if (!providedSecret) {
+    return { error: "Ingresa la clave de moderación." };
+  }
+
+  const providedHash = hashModerationSecret(providedSecret);
+
+  if (providedHash !== expectedHash) {
+    return { error: "La clave ingresada no coincide." };
+  }
+
+  const cookieStore = await cookies();
+
+  cookieStore.set({
+    name: adminTokenCookie(),
+    value: expectedHash,
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: 60 * 60 * 8,
+    path: "/",
+  });
+
+  return { message: "Sesión de moderación activada." };
+}
+
+export async function logoutAdmin(
+  _prevState: ActionResult | undefined,
+  _formData: FormData,
+): Promise<ActionResult> {
+  void _prevState;
+  void _formData;
+  const cookieStore = await cookies();
+  cookieStore.delete(adminTokenCookie());
+
+  return { message: "Sesión de moderación cerrada." };
+}
 
 export async function createPost(
   prevState: CreatePostState | undefined,
@@ -325,9 +378,14 @@ export async function deletePost(
   }
 
   const cookieStore = await cookies();
+  const isAdmin = isAdminTokenValid(cookieStore.get(adminTokenCookie())?.value);
   const tokenCookie = cookieStore.get(postTokenCookie(slug));
-  if (!tokenCookie || !post.authorToken || tokenCookie.value !== post.authorToken) {
-    return { error: "Solo quien publicó este mensaje puede eliminarlo desde este navegador." };
+  const isAuthor = Boolean(tokenCookie && post.authorToken && tokenCookie.value === post.authorToken);
+
+  if (!isAdmin && !isAuthor) {
+    return {
+      error: "Solo quien publicó este mensaje o un moderador autorizado puede eliminarlo desde este navegador.",
+    };
   }
 
   await prisma.post.delete({ where: { id: post.id } });
@@ -499,10 +557,13 @@ export async function deleteComment(
   }
 
   const cookieStore = await cookies();
+  const isAdmin = isAdminTokenValid(cookieStore.get(adminTokenCookie())?.value);
   const tokenCookie = cookieStore.get(commentTokenCookie(commentId));
-  if (!tokenCookie || !comment.authorToken || tokenCookie.value !== comment.authorToken) {
+  const isAuthor = Boolean(tokenCookie && comment.authorToken && tokenCookie.value === comment.authorToken);
+
+  if (!isAdmin && !isAuthor) {
     return {
-      error: "Solo quien escribió este comentario puede eliminarlo desde este navegador.",
+      error: "Solo quien escribió este comentario o un moderador autorizado puede eliminarlo desde este navegador.",
     };
   }
 

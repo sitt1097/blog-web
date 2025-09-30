@@ -15,12 +15,16 @@ export function PostOwnerPanel({
   content,
   alias,
   tags,
+  canEdit,
+  canModerate,
 }: {
   slug: string;
   title: string;
   content: string;
   alias: string;
   tags: string;
+  canEdit: boolean;
+  canModerate: boolean;
 }) {
   const [editing, setEditing] = useState(false);
   const router = useRouter();
@@ -28,10 +32,10 @@ export function PostOwnerPanel({
   const [deleteState, deleteAction] = useFormState(deletePost, initialDeleteState);
 
   useEffect(() => {
-    if (updateState?.message) {
+    if (canEdit && updateState?.message) {
       setEditing(false);
     }
-  }, [updateState?.message]);
+  }, [updateState?.message, canEdit]);
 
   useEffect(() => {
     if (deleteState?.message) {
@@ -39,26 +43,33 @@ export function PostOwnerPanel({
     }
   }, [deleteState?.message, router]);
 
+  if (!canModerate) {
+    return null;
+  }
+
   return (
 
     <div className="mt-6 rounded-3xl border border-indigo-300/30 bg-indigo-950/40 p-6 text-sm text-white/80 shadow-inner shadow-indigo-900/40">
 
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p>
-          Esta publicación está vinculada a tu navegador. Aquí puedes editarla, añadir novedades o eliminarla cuando lo
-          necesites.
+          {canEdit
+            ? "Esta publicación está vinculada a tu navegador. Aquí puedes editarla, añadir novedades o eliminarla cuando lo necesites."
+            : "Has iniciado sesión como moderador/a. Si detectas contenido ofensivo o que incumple las normas puedes retirarlo desde aquí."}
         </p>
-        <button
-          type="button"
-          onClick={() => setEditing(prev => !prev)}
+        {canEdit ? (
+          <button
+            type="button"
+            onClick={() => setEditing(prev => !prev)}
 
-          className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-100 transition hover:border-white/40 hover:bg-white/20"
+            className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-semibold uppercase tracking-widest text-indigo-100 transition hover:border-white/40 hover:bg-white/20"
 
-        >
-          {editing ? "Cerrar edición" : "Editar publicación"}
-        </button>
+          >
+            {editing ? "Cerrar edición" : "Editar publicación"}
+          </button>
+        ) : null}
       </div>
-      {editing ? (
+      {editing && canEdit ? (
 
         <form action={updateAction} className="mt-6 space-y-5 text-white">
           <input type="hidden" name="slug" value={slug} />
@@ -155,8 +166,9 @@ export function PostOwnerPanel({
         ) : null}
         <DeleteButton />
         <p>
-          Si eliminas el mensaje desaparecerá de inmediato junto con todos los comentarios asociados. Esta acción no se puede
-          deshacer.
+          {canEdit
+            ? "Si eliminas el mensaje desaparecerá de inmediato junto con todos los comentarios asociados. Esta acción no se puede deshacer."
+            : "Eliminar la publicación la retirará de inmediato junto con todos los comentarios asociados. Esta acción no se puede deshacer."}
         </p>
       </form>
     </div>

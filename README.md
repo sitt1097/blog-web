@@ -28,6 +28,16 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Moderation
+
+To allow administrators to remove offensive content set a secret key in your environment:
+
+```bash
+export MODERATION_SECRET="choose-a-strong-secret"
+```
+
+Moderators can enter this key in the post page to activate a moderation session. While the session is active, they can delete any publication or comment directly from the interface.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:

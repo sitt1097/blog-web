@@ -7,8 +7,15 @@ import { Prisma } from "@prisma/client";
 import { markdownToHtml } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 
-import { commentReactionCookie, commentTokenCookie, postReactionCookie, postTokenCookie } from "@/lib/tokens";
+import {
+  adminTokenCookie,
+  commentReactionCookie,
+  commentTokenCookie,
+  postReactionCookie,
+  postTokenCookie,
+} from "@/lib/tokens";
 import { reactionsFromCookie, totalReactions } from "@/lib/reactions";
+import { isAdminTokenValid, isModerationEnabled } from "@/lib/admin";
 
 import { CommentsSection, type CommentNode } from "./comments";
 import { PostOwnerPanel } from "./post-editor";
@@ -230,9 +237,14 @@ export default async function PostPage({
   const contentHtml = markdownToHtml(post.contentMd);
   const tagNames = post.tags.map(({ tag }) => tag.name);
   const cookieStore = await cookies();
-  const canManagePost = Boolean(
+  const moderationEnabled = isModerationEnabled();
+  const viewerIsAdmin = moderationEnabled
+    ? isAdminTokenValid(cookieStore.get(adminTokenCookie())?.value)
+    : false;
+  const viewerOwnsPost = Boolean(
     post.authorToken && cookieStore.get(postTokenCookie(slug))?.value === post.authorToken,
   );
+  const canModeratePost = viewerOwnsPost || viewerIsAdmin;
 
 
   const mapComment = (
@@ -243,6 +255,7 @@ export default async function PostPage({
     const canEdit = Boolean(
       comment.authorToken && cookieStore.get(commentTokenCookie(comment.id))?.value === comment.authorToken,
     );
+    const canModerate = canEdit || viewerIsAdmin;
 
     const viewerReactions = reactionsFromCookie(
       cookieStore.get(commentReactionCookie(comment.id))?.value,
@@ -264,6 +277,7 @@ export default async function PostPage({
       createdAtLabel: dateFormatter.format(comment.createdAt),
       wasEdited: comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000,
       canEdit,
+      canModerate,
       ownedByViewer: canEdit,
       replyingToOwner: parentOwned,
       parentId: comment.parentId ?? null,
@@ -321,13 +335,15 @@ export default async function PostPage({
                 initialCounts={postReactionCounts}
                 initialViewerReactions={viewerPostReactions}
               />
-              {canManagePost ? (
+              {canModeratePost ? (
                 <PostOwnerPanel
                   slug={post.slug}
                   title={post.title}
                   content={post.contentMd}
                   alias={post.authorAlias ?? ""}
                   tags={tagNames.join(", ")}
+                  canEdit={viewerOwnsPost}
+                  canModerate={canModeratePost}
                 />
               ) : null}
             </div>
@@ -335,7 +351,13 @@ export default async function PostPage({
         </div>
 
         {databaseConfigured && !loadErrorMessage ? (
-          <CommentsSection slug={post.slug} comments={comments} canManagePost={canManagePost} />
+          <CommentsSection
+            slug={post.slug}
+            comments={comments}
+            canManagePost={viewerOwnsPost}
+            isAdmin={viewerIsAdmin}
+            moderationEnabled={moderationEnabled}
+          />
         ) : null}
 
         <FallbackFooter
