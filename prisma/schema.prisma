@@ -27,7 +27,9 @@ model Post {
   author      User?     @relation(fields: [authorId], references: [id])
   authorId    String?
   authorAlias String?   // nombre opcional mostrado públicamente
+  authorToken String?   @unique
   tags        TagOnPost[]
+  comments    Comment[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -44,4 +46,18 @@ model TagOnPost {
   post Post @relation(fields: [postId], references: [id])
   tag  Tag  @relation(fields: [tagId], references: [id])
   @@id([postId, tagId])
+}
+
+model Comment {
+  id          String    @id @default(cuid())
+  post        Post      @relation(fields: [postId], references: [id])
+  postId      String
+  parent      Comment?  @relation("CommentToComment", fields: [parentId], references: [id])
+  parentId    String?
+  replies     Comment[] @relation("CommentToComment")
+  contentMd   String
+  authorAlias String?
+  authorToken String?   @unique
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

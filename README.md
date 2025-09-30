@@ -8,6 +8,8 @@ First, make sure your database schema is up to date:
 npx prisma migrate deploy
 ```
 
+> **Nota:** Los comandos `npm run dev` y `npm run build` ejecutan `prisma migrate deploy` automáticamente si `DATABASE_URL` está configurado, así que generalmente no tendrás que hacerlo manualmente.
+
 Then run the development server:
 
 ```bash

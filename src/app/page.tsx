@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { Prisma } from "@prisma/client";
+
 import { NewPostForm } from "@/app/_components/new-post-form";
 import { prisma } from "@/lib/prisma";
 
@@ -44,7 +46,7 @@ const fallbackPosts: PostPreview[] = [
 export default async function Home() {
   const databaseConfigured = Boolean(process.env.DATABASE_URL);
   let posts: PostPreview[] = [];
-  let loadError = false;
+  let loadErrorMessage: string | null = null;
 
   if (databaseConfigured) {
     try {
@@ -66,11 +68,16 @@ export default async function Home() {
       });
     } catch (error) {
       console.error("No se pudo leer la base de datos", error);
-      loadError = true;
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
+        loadErrorMessage =
+          'Actualiza tu base de datos ejecutando "npx prisma migrate deploy" para aplicar los cambios más recientes.';
+      } else {
+        loadErrorMessage = "No se pudo conectar con la base de datos en este momento.";
+      }
     }
   }
 
-  if (!databaseConfigured || loadError) {
+  if (!databaseConfigured || loadErrorMessage) {
     posts = fallbackPosts;
   }
 
@@ -105,10 +112,15 @@ export default async function Home() {
               <div>
                 <h2 className="text-2xl font-semibold">Últimas publicaciones</h2>
                 <p className="text-sm text-white/70">
-                  {databaseConfigured && !loadError
+                  {databaseConfigured && !loadErrorMessage
                     ? "Lee lo que otras personas están compartiendo ahora mismo."
                     : "Mostramos ejemplos porque la base de datos aún no está configurada."}
                 </p>
+                {loadErrorMessage ? (
+                  <p className="mt-2 rounded-lg border border-amber-300/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
+                    {loadErrorMessage}
+                  </p>
+                ) : null}
               </div>
               <span className="text-xs uppercase tracking-wide text-white/60">
                 {posts.length} {posts.length === 1 ? "entrada" : "entradas"}
