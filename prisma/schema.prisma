@@ -68,6 +68,6 @@ model Comment {
   reactionHeart    Int  @default(0)
   reactionHope     Int  @default(0)
   reactionClap     Int  @default(0)
-ateTime  @default(now())
+  createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
