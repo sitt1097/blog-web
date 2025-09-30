@@ -56,6 +56,7 @@ type CommentWithChildren = {
 };
 
 type PostWithTags = {
+  id: string;
   title: string;
   slug: string;
   contentMd: string;
@@ -68,6 +69,22 @@ type PostWithTags = {
   comments: CommentWithChildren[];
 };
 
+type CommentRecord = Prisma.CommentGetPayload<{
+  select: {
+    id: true;
+    contentMd: true;
+    createdAt: true;
+    updatedAt: true;
+    authorAlias: true;
+    authorToken: true;
+    parentId: true;
+  };
+}>;
+
+type CommentWithChildren = CommentRecord & {
+  replies: CommentWithChildren[];
+};
+
 export default async function PostPage({
   params,
 }: {
@@ -78,10 +95,11 @@ export default async function PostPage({
   let loadErrorMessage: string | null = null;
 
   let post: PostWithTags | null = null;
+  let commentTree: CommentWithChildren[] = [];
 
   if (databaseConfigured) {
     try {
-      post = (await prisma.post.findUnique({
+      const foundPost = (await prisma.post.findUnique({
         where: { slug },
         include: {
           tags: {
@@ -102,6 +120,45 @@ export default async function PostPage({
           },
         },
       })) as PostWithTags | null;
+
+      post = foundPost;
+
+      if (foundPost) {
+        const rawComments = (await prisma.comment.findMany({
+          where: { postId: foundPost.id },
+          orderBy: [{ createdAt: "asc" }],
+        })) as CommentRecord[];
+
+        const nodes = new Map<string, CommentWithChildren>();
+        const pending = new Map<string, CommentWithChildren[]>();
+        const roots: CommentWithChildren[] = [];
+
+        for (const record of rawComments) {
+          const node: CommentWithChildren = { ...record, replies: [] };
+          nodes.set(record.id, node);
+
+          const waitingChildren = pending.get(record.id);
+          if (waitingChildren) {
+            node.replies.push(...waitingChildren);
+            pending.delete(record.id);
+          }
+
+          if (record.parentId) {
+            const parent = nodes.get(record.parentId);
+            if (parent) {
+              parent.replies.push(node);
+            } else {
+              const orphans = pending.get(record.parentId) ?? [];
+              orphans.push(node);
+              pending.set(record.parentId, orphans);
+            }
+          } else {
+            roots.push(node);
+          }
+        }
+
+        commentTree = roots;
+      }
     } catch (error) {
       console.error("No se pudo leer la base de datos", error);
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
@@ -176,7 +233,8 @@ export default async function PostPage({
     replies: comment.replies.map(mapComment),
   });
 
-  const comments = post.comments.map(mapComment);
+  const comments = commentTree.map(mapComment);
+
 
   return (
     <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.3),_transparent_65%)] py-16 text-white">
