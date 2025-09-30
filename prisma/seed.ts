@@ -13,8 +13,11 @@ async function main() {
     create: {
       title: 'Hola Mundo',
       slug: 'hola-mundo',
-      content: 'Este es mi primer post con Next.js + Prisma + Postgres.',
+      excerpt: 'Presentación breve de la comunidad anónima.',
+      contentMd: `# Hola Mundo\n\nBienvenid@ a la comunidad anónima. Comparte tus pensamientos sin miedo y recuerda respetar a los demás.`,
       published: true,
+      publishedAt: new Date(),
+      authorAlias: 'Equipo',
       tags: { create: [{ tagId: tag.id }] }
     }
   })
