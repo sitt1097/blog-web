@@ -4,6 +4,7 @@ import { randomUUID } from "crypto";
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
 
 import type { Prisma } from "@prisma/client";
@@ -393,9 +394,8 @@ export async function deletePost(
   cookieStore.delete(postTokenCookie(slug));
 
   revalidatePath("/");
-  revalidatePath(`/post/${slug}`);
 
-  return { message: "La publicación se eliminó." };
+  redirect("/");
 }
 
 export async function createComment(
