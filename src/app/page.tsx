@@ -184,9 +184,9 @@ export default async function Home({ searchParams }: { searchParams: SearchParam
                     ? "Lee lo que otras personas están compartiendo ahora mismo."
                     : "Mostramos ejemplos porque la base de datos aún no está configurada."}
                 </p>
-                {loadErrorMessage ? (
+                {data.loadErrorMessage ? (
                   <p className="mt-2 rounded-lg border border-amber-300/40 bg-amber-400/10 px-3 py-2 text-xs text-amber-100">
-                    {loadErrorMessage}
+                    {data.loadErrorMessage}
                   </p>
                 ) : null}
               </div>
@@ -387,6 +387,9 @@ async function loadPageData({ query, tag, page, sort }: LoaderArgs): Promise<Pag
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2022") {
         loadErrorMessage =
           'Actualiza tu base de datos ejecutando "npx prisma migrate deploy" para aplicar los cambios más recientes.';
+      } else if (error instanceof Prisma.PrismaClientValidationError) {
+        loadErrorMessage =
+          'Tu cliente de Prisma no reconoce las columnas de reacciones. Ejecuta "npx prisma migrate deploy" seguido de "npx prisma generate".';
       } else {
         loadErrorMessage = "No se pudo conectar con la base de datos en este momento.";
       }
