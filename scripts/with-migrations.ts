@@ -38,12 +38,19 @@ function runCommand(command: string, args: string[]) {
 
 async function ensureMigrations() {
   const databaseUrl = process.env.DATABASE_URL?.trim();
+  const directUrl = process.env.DIRECT_URL?.trim();
 
   if (!databaseUrl) {
     console.warn(
       "[with-migrations] DATABASE_URL is not set, skipping Prisma migrations."
     );
     return;
+  }
+
+  if (!directUrl) {
+    console.warn(
+      "[with-migrations] DIRECT_URL is not set. Prisma will reuse DATABASE_URL for migrations."
+    );
   }
 
   console.log("[with-migrations] Applying Prisma migrations before continuing...");
