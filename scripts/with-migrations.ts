@@ -36,7 +36,22 @@ function runCommand(command: string, args: string[]) {
   });
 }
 
+function isTruthyEnv(value: string | undefined) {
+  if (!value) return false;
+  return ["1", "true", "yes"].includes(value.toLowerCase());
+}
+
 async function ensureMigrations() {
+  if (
+    isTruthyEnv(process.env.SKIP_PRISMA_MIGRATIONS) ||
+    isTruthyEnv(process.env.VERCEL)
+  ) {
+    console.warn(
+      "[with-migrations] Skipping Prisma migrations due to CI/hosting environment."
+    );
+    return;
+  }
+
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const directUrl = process.env.DIRECT_URL?.trim();
 
