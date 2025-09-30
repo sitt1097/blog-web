@@ -55,17 +55,6 @@ const fallbackPosts: Record<
   },
 };
 
-type CommentWithChildren = {
-  id: string;
-  contentMd: string;
-  createdAt: Date;
-  updatedAt: Date;
-  authorAlias: string | null;
-  authorToken: string | null;
-  parentId: string | null;
-  replies: CommentWithChildren[];
-};
-
 type PostWithTags = {
   id: string;
   title: string;
