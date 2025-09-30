@@ -5,9 +5,89 @@ import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 
+
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 import { excerptFromMarkdown, slugify } from "@/lib/posts";
-import { commentTokenCookie, postTokenCookie } from "@/lib/tokens";
+import {
+  commentReactionCookie,
+  commentTokenCookie,
+  postReactionCookie,
+  postTokenCookie,
+} from "@/lib/tokens";
+
+const reactionTypes = ["thumbsUp", "heart", "hope", "clap"] as const;
+type ReactionType = (typeof reactionTypes)[number];
+
+const reactionFieldByType: Record<ReactionType, keyof Prisma.PostUncheckedUpdateInput> = {
+  thumbsUp: "reactionThumbsUp",
+  heart: "reactionHeart",
+  hope: "reactionHope",
+  clap: "reactionClap",
+};
+
+const commentReactionFieldByType: Record<ReactionType, keyof Prisma.CommentUncheckedUpdateInput> = {
+  thumbsUp: "reactionThumbsUp",
+  heart: "reactionHeart",
+  hope: "reactionHope",
+  clap: "reactionClap",
+};
+
+function parseReactionCookie(value: string | undefined): Set<ReactionType> {
+  if (!value) {
+    return new Set();
+  }
+
+  const parsed = value
+    .split(",")
+    .map(token => token.trim())
+    .filter((token): token is ReactionType => reactionTypes.includes(token as ReactionType));
+
+  return new Set(parsed);
+}
+
+function serializeReactions(set: Set<ReactionType>): string {
+  return Array.from(set).join(",");
+}
+
+function getPostReactionCount(
+  record:
+    | { reactionThumbsUp: number; reactionHeart: number; reactionHope: number; reactionClap: number }
+    | null,
+  reaction: ReactionType,
+): number {
+  if (!record) return 0;
+  switch (reaction) {
+    case "thumbsUp":
+      return record.reactionThumbsUp;
+    case "heart":
+      return record.reactionHeart;
+    case "hope":
+      return record.reactionHope;
+    case "clap":
+      return record.reactionClap;
+  }
+}
+
+function getCommentReactionCount(
+  record:
+    | { reactionThumbsUp: number; reactionHeart: number; reactionHope: number; reactionClap: number }
+    | null,
+  reaction: ReactionType,
+): number {
+  if (!record) return 0;
+  switch (reaction) {
+    case "thumbsUp":
+      return record.reactionThumbsUp;
+    case "heart":
+      return record.reactionHeart;
+    case "hope":
+      return record.reactionHope;
+    case "clap":
+      return record.reactionClap;
+  }
+}
 
 export type CreatePostState = {
   message?: string;
@@ -433,4 +513,179 @@ export async function deleteComment(
   revalidatePath(`/post/${comment.post.slug}`);
 
   return { message: "El comentario se eliminó." };
+}
+
+
+export async function reactToPost(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const slug = (formData.get("slug") ?? "").toString();
+  const reaction = (formData.get("reaction") ?? "").toString() as ReactionType;
+
+  if (!slug) {
+    return { error: "No encontramos la publicación." };
+  }
+
+  if (!reactionTypes.includes(reaction)) {
+    return { error: "Tipo de reacción no válido." };
+  }
+
+  const field = reactionFieldByType[reaction];
+
+  const post = await prisma.post.findUnique({
+    where: { slug },
+    select: {
+      slug: true,
+      reactionThumbsUp: true,
+      reactionHeart: true,
+      reactionHope: true,
+      reactionClap: true,
+    },
+  });
+
+  if (!post) {
+    return { error: "La publicación ya no está disponible." };
+  }
+
+  const cookieStore = await cookies();
+  const cookieName = postReactionCookie(slug);
+  const currentReactions = parseReactionCookie(cookieStore.get(cookieName)?.value);
+  const togglingOff = currentReactions.has(reaction);
+  const currentCount = getPostReactionCount(post, reaction);
+  const delta = togglingOff ? (currentCount > 0 ? -1 : 0) : 1;
+
+  if (delta !== 0) {
+    const data: Prisma.PostUncheckedUpdateInput = {};
+    switch (field) {
+      case "reactionThumbsUp":
+        data.reactionThumbsUp = { increment: delta };
+        break;
+      case "reactionHeart":
+        data.reactionHeart = { increment: delta };
+        break;
+      case "reactionHope":
+        data.reactionHope = { increment: delta };
+        break;
+      case "reactionClap":
+        data.reactionClap = { increment: delta };
+        break;
+    }
+
+    await prisma.post.update({
+      where: { slug },
+      data,
+    });
+  }
+
+  if (togglingOff) {
+    currentReactions.delete(reaction);
+  } else {
+    currentReactions.add(reaction);
+  }
+
+  if (currentReactions.size === 0) {
+    cookieStore.delete(cookieName);
+  } else {
+    cookieStore.set({
+      name: cookieName,
+      value: serializeReactions(currentReactions),
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 180,
+      path: `/post/${slug}`,
+    });
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/post/${slug}`);
+
+  return { message: togglingOff ? "Quitaste tu reacción." : "¡Gracias por reaccionar!" };
+}
+
+export async function reactToComment(
+  _prevState: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const commentId = (formData.get("commentId") ?? "").toString();
+  const reaction = (formData.get("reaction") ?? "").toString() as ReactionType;
+
+  if (!commentId) {
+    return { error: "No encontramos el comentario." };
+  }
+
+  if (!reactionTypes.includes(reaction)) {
+    return { error: "Tipo de reacción no válido." };
+  }
+
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: {
+      id: true,
+      post: { select: { slug: true } },
+      reactionThumbsUp: true,
+      reactionHeart: true,
+      reactionHope: true,
+      reactionClap: true,
+    },
+  });
+
+  if (!comment || !comment.post?.slug) {
+    return { error: "El comentario ya no está disponible." };
+  }
+
+  const field = commentReactionFieldByType[reaction];
+  const currentCount = getCommentReactionCount(comment, reaction);
+
+  const cookieStore = await cookies();
+  const cookieName = commentReactionCookie(commentId);
+  const currentReactions = parseReactionCookie(cookieStore.get(cookieName)?.value);
+  const togglingOff = currentReactions.has(reaction);
+  const delta = togglingOff ? (currentCount > 0 ? -1 : 0) : 1;
+
+  if (delta !== 0) {
+    const data: Prisma.CommentUncheckedUpdateInput = {};
+    switch (field) {
+      case "reactionThumbsUp":
+        data.reactionThumbsUp = { increment: delta };
+        break;
+      case "reactionHeart":
+        data.reactionHeart = { increment: delta };
+        break;
+      case "reactionHope":
+        data.reactionHope = { increment: delta };
+        break;
+      case "reactionClap":
+        data.reactionClap = { increment: delta };
+        break;
+    }
+
+    await prisma.comment.update({
+      where: { id: commentId },
+      data,
+    });
+  }
+
+  if (togglingOff) {
+    currentReactions.delete(reaction);
+  } else {
+    currentReactions.add(reaction);
+  }
+
+  if (currentReactions.size === 0) {
+    cookieStore.delete(cookieName);
+  } else {
+    cookieStore.set({
+      name: cookieName,
+      value: serializeReactions(currentReactions),
+      httpOnly: false,
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 180,
+      path: "/",
+    });
+  }
+
+  revalidatePath(`/post/${comment.post.slug}`);
+
+  return { message: togglingOff ? "Quitaste tu reacción." : "¡Gracias por reaccionar!" };
 }

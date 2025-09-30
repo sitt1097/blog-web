@@ -5,3 +5,11 @@ export function postTokenCookie(slug: string) {
 export function commentTokenCookie(id: string) {
   return `comment-token-${id}`;
 }
+
+export function postReactionCookie(slug: string) {
+  return `post-reactions-${slug}`;
+}
+
+export function commentReactionCookie(id: string) {
+  return `comment-reactions-${id}`;
+}

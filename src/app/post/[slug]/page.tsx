@@ -6,10 +6,14 @@ import { Prisma } from "@prisma/client";
 
 import { markdownToHtml } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
-import { commentTokenCookie, postTokenCookie } from "@/lib/tokens";
+
+import { commentReactionCookie, commentTokenCookie, postReactionCookie, postTokenCookie } from "@/lib/tokens";
+import { reactionsFromCookie, totalReactions } from "@/lib/reactions";
 
 import { CommentsSection, type CommentNode } from "./comments";
 import { PostOwnerPanel } from "./post-editor";
+import { ReactionBar } from "./reaction-bar";
+
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +70,12 @@ type PostWithTags = {
   authorAlias: string | null;
   authorToken: string | null;
   tags: { tag: { name: string } }[];
-  comments: CommentWithChildren[];
+
+  reactionThumbsUp: number;
+  reactionHeart: number;
+  reactionHope: number;
+  reactionClap: number;
+
 };
 
 type CommentRecord = Prisma.CommentGetPayload<{
@@ -78,6 +87,12 @@ type CommentRecord = Prisma.CommentGetPayload<{
     authorAlias: true;
     authorToken: true;
     parentId: true;
+
+    reactionThumbsUp: true;
+    reactionHeart: true;
+    reactionHope: true;
+    reactionClap: true;
+
   };
 }>;
 
@@ -219,68 +234,116 @@ export default async function PostPage({
     post.authorToken && cookieStore.get(postTokenCookie(slug))?.value === post.authorToken,
   );
 
-  const mapComment = (comment: CommentWithChildren): CommentNode => ({
-    id: comment.id,
-    contentHtml: markdownToHtml(comment.contentMd),
-    contentMd: comment.contentMd,
-    authorAlias: comment.authorAlias,
-    createdAtIso: comment.createdAt.toISOString(),
-    createdAtLabel: dateFormatter.format(comment.createdAt),
-    wasEdited: comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000,
-    canEdit: Boolean(
-      comment.authorToken && cookieStore.get(commentTokenCookie(comment.id))?.value === comment.authorToken,
-    ),
-    replies: comment.replies.map(mapComment),
-  });
 
-  const comments = commentTree.map(mapComment);
+  const mapComment = (
+    comment: CommentWithChildren,
+    depth: number,
+    parentOwned: boolean,
+  ): CommentNode => {
+    const canEdit = Boolean(
+      comment.authorToken && cookieStore.get(commentTokenCookie(comment.id))?.value === comment.authorToken,
+    );
+
+    const viewerReactions = reactionsFromCookie(
+      cookieStore.get(commentReactionCookie(comment.id))?.value,
+    );
+
+    const counts = {
+      reactionThumbsUp: comment.reactionThumbsUp,
+      reactionHeart: comment.reactionHeart,
+      reactionHope: comment.reactionHope,
+      reactionClap: comment.reactionClap,
+    };
+
+    return {
+      id: comment.id,
+      contentHtml: markdownToHtml(comment.contentMd),
+      contentMd: comment.contentMd,
+      authorAlias: comment.authorAlias,
+      createdAtIso: comment.createdAt.toISOString(),
+      createdAtLabel: dateFormatter.format(comment.createdAt),
+      wasEdited: comment.updatedAt.getTime() - comment.createdAt.getTime() > 60_000,
+      canEdit,
+      ownedByViewer: canEdit,
+      replyingToOwner: parentOwned,
+      parentId: comment.parentId ?? null,
+      depth,
+      reactions: {
+        counts,
+        viewer: viewerReactions,
+      },
+      totalReactionScore: totalReactions(counts),
+      replies: comment.replies.map((child: CommentWithChildren) => mapComment(child, depth + 1, canEdit)),
+    };
+  };
+
+  const comments = commentTree.map(comment => mapComment(comment, 0, false));
+
+  const postReactionCounts = {
+    reactionThumbsUp: post.reactionThumbsUp,
+    reactionHeart: post.reactionHeart,
+    reactionHope: post.reactionHope,
+    reactionClap: post.reactionClap,
+  };
+
+  const viewerPostReactions = reactionsFromCookie(cookieStore.get(postReactionCookie(post.slug))?.value);
 
 
   return (
-    <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.3),_transparent_65%)] py-16 text-white">
-      <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/5 px-6 py-10 shadow-2xl shadow-indigo-900/30 backdrop-blur">
-        <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-wide text-white/60">
-          <span>{post.authorAlias || "Anónimo/a"}</span>
-          <time dateTime={publishedAt.toISOString()}>{dateFormatter.format(publishedAt)}</time>
-        </div>
-        <h1 className="mt-6 text-4xl font-bold leading-tight text-white">{post.title}</h1>
-        {tagNames.length ? (
-          <ul className="mt-6 flex flex-wrap gap-2 text-xs text-white/70">
-            {tagNames.map(name => (
-              <li key={name} className="rounded-full border border-white/20 px-3 py-1">
-                #{name}
-              </li>
-            ))}
-          </ul>
-        ) : null}
-        <article
-          className="prose prose-invert mt-10 max-w-none prose-headings:text-white prose-strong:text-white"
-          dangerouslySetInnerHTML={{ __html: contentHtml }}
-        />
-        {canManagePost ? (
-          <PostOwnerPanel
-            slug={post.slug}
-            title={post.title}
-            content={post.contentMd}
-            alias={post.authorAlias ?? ""}
-            tags={tagNames.join(", ")}
-          />
-        ) : null}
-        {databaseConfigured && !loadErrorMessage ? (
-          <>
-            <CommentsSection slug={post.slug} comments={comments} />
-            <FallbackFooter
-              databaseConfigured={databaseConfigured}
-              loadErrorMessage={loadErrorMessage}
+    <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.35),_transparent_70%)] py-16 text-white">
+      <div className="mx-auto flex max-w-5xl flex-col gap-12 px-6">
+        <div className="overflow-hidden rounded-4xl border border-indigo-300/40 bg-gradient-to-br from-indigo-900/80 via-slate-950 to-indigo-950 p-[1px] shadow-[0_20px_60px_-30px_rgba(79,70,229,0.8)]">
+          <div className="rounded-[calc(theme(borderRadius.4xl)-1px)] bg-slate-950/80 p-10">
+            <div className="flex flex-wrap items-center justify-between gap-4 text-xs uppercase tracking-widest text-indigo-100/70">
+              <span>{post.authorAlias || "Anónimo/a"}</span>
+              <time dateTime={publishedAt.toISOString()}>{dateFormatter.format(publishedAt)}</time>
+            </div>
+            <h1 className="mt-6 font-heading text-4xl leading-tight text-white md:text-5xl">{post.title}</h1>
+            {tagNames.length ? (
+              <ul className="mt-6 flex flex-wrap gap-3 text-xs font-medium text-indigo-100/80">
+                {tagNames.map(name => (
+                  <li
+                    key={name}
+                    className="rounded-full border border-indigo-300/40 bg-indigo-500/10 px-4 py-1 tracking-widest"
+                  >
+                    #{name}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <article
+              className="prose prose-invert mt-10 max-w-none text-lg leading-relaxed prose-headings:font-heading prose-headings:text-white prose-strong:text-white"
+              dangerouslySetInnerHTML={{ __html: contentHtml }}
             />
-          </>
-        ) : (
-          <FallbackFooter
-            databaseConfigured={databaseConfigured}
-            loadErrorMessage={loadErrorMessage}
-          />
+            <div className="mt-10 flex flex-col gap-6">
+              <ReactionBar
+                slug={post.slug}
+                initialCounts={postReactionCounts}
+                initialViewerReactions={viewerPostReactions}
+              />
+              {canManagePost ? (
+                <PostOwnerPanel
+                  slug={post.slug}
+                  title={post.title}
+                  content={post.contentMd}
+                  alias={post.authorAlias ?? ""}
+                  tags={tagNames.join(", ")}
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
 
-        )}
+        {databaseConfigured && !loadErrorMessage ? (
+          <CommentsSection slug={post.slug} comments={comments} canManagePost={canManagePost} />
+        ) : null}
+
+        <FallbackFooter
+          databaseConfigured={databaseConfigured}
+          loadErrorMessage={loadErrorMessage}
+        />
+
+
       </div>
     </main>
   );
