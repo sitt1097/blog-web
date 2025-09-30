@@ -44,6 +44,17 @@ const fallbackPosts: Record<
   },
 };
 
+type CommentWithChildren = {
+  id: string;
+  contentMd: string;
+  createdAt: Date;
+  updatedAt: Date;
+  authorAlias: string | null;
+  authorToken: string | null;
+  parentId: string | null;
+  replies: CommentWithChildren[];
+};
+
 type PostWithTags = {
   id: string;
   title: string;
@@ -55,6 +66,7 @@ type PostWithTags = {
   authorAlias: string | null;
   authorToken: string | null;
   tags: { tag: { name: string } }[];
+  comments: CommentWithChildren[];
 };
 
 type CommentRecord = Prisma.CommentGetPayload<{
@@ -94,6 +106,15 @@ export default async function PostPage({
             include: {
               tag: {
                 select: { name: true },
+              },
+            },
+          },
+          comments: {
+            where: { parentId: null },
+            orderBy: { createdAt: "asc" },
+            include: {
+              replies: {
+                orderBy: { createdAt: "asc" },
               },
             },
           },
@@ -214,6 +235,7 @@ export default async function PostPage({
 
   const comments = commentTree.map(mapComment);
 
+
   return (
     <main className="min-h-screen bg-slate-950 bg-[radial-gradient(circle_at_top,_rgba(99,102,241,0.3),_transparent_65%)] py-16 text-white">
       <div className="mx-auto max-w-3xl rounded-3xl border border-white/10 bg-white/5 px-6 py-10 shadow-2xl shadow-indigo-900/30 backdrop-blur">
@@ -257,6 +279,7 @@ export default async function PostPage({
             databaseConfigured={databaseConfigured}
             loadErrorMessage={loadErrorMessage}
           />
+
         )}
       </div>
     </main>
