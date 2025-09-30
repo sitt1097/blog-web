@@ -6,8 +6,8 @@
     "seed": "tsx prisma/seed.ts"
   },
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build --turbopack",
+    "dev": "tsx scripts/with-migrations.ts next dev --turbopack",
+    "build": "tsx scripts/with-migrations.ts next build --turbopack",
     "start": "next start",
     "lint": "eslint"
   },
