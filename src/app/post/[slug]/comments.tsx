@@ -3,11 +3,14 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 
+import { useRouter } from "next/navigation";
 import { useFormState, useFormStatus } from "react-dom";
 
 import {
+  authenticateAdmin,
   createComment,
   deleteComment,
+  logoutAdmin,
   reactToComment,
   type ActionResult,
   type CommentFormState,
@@ -25,6 +28,7 @@ export type CommentNode = {
   createdAtLabel: string;
   wasEdited: boolean;
   canEdit: boolean;
+  canModerate: boolean;
 
   ownedByViewer: boolean;
   replyingToOwner: boolean;
@@ -42,6 +46,8 @@ type CommentsSectionProps = {
   slug: string;
   comments: CommentNode[];
   canManagePost: boolean;
+  isAdmin: boolean;
+  moderationEnabled: boolean;
 };
 
 type SortMode = "recent" | "top";
@@ -53,12 +59,16 @@ type ReactionState = {
 
 const initialCommentState: CommentFormState = {};
 const initialDeleteState: ActionResult = {};
+const initialModerationState: ActionResult = {};
 
-export function CommentsSection({ slug, comments, canManagePost }: CommentsSectionProps) {
+export function CommentsSection({ slug, comments, canManagePost, isAdmin, moderationEnabled }: CommentsSectionProps) {
   const [sortMode, setSortMode] = useState<SortMode>("recent");
   const [formState, formAction] = useFormState(createComment, initialCommentState);
   const [hasSubmitted, setHasSubmitted] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
+  const router = useRouter();
+  const [loginState, loginAction] = useFormState(authenticateAdmin, initialModerationState);
+  const [logoutState, logoutAction] = useFormState(logoutAdmin, initialModerationState);
 
 
   useEffect(() => {
@@ -66,6 +76,12 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
       setHasSubmitted(prev => !prev);
     }
   }, [formState?.message]);
+
+  useEffect(() => {
+    if (loginState?.message || logoutState?.message) {
+      router.refresh();
+    }
+  }, [loginState?.message, logoutState?.message, router]);
 
 
   const sortedComments = useMemo(() => sortCommentTree(comments, sortMode), [comments, sortMode]);
@@ -214,7 +230,121 @@ export function CommentsSection({ slug, comments, canManagePost }: CommentsSecti
         </div>
       </form>
 
+      <ModerationPanel
+        isAdmin={isAdmin}
+        moderationEnabled={moderationEnabled}
+        loginState={loginState}
+        loginAction={loginAction}
+        logoutState={logoutState}
+        logoutAction={logoutAction}
+      />
+
     </section>
+  );
+}
+
+
+type ModerationPanelProps = {
+  isAdmin: boolean;
+  moderationEnabled: boolean;
+  loginState: ActionResult;
+  loginAction: (formData: FormData) => void;
+  logoutState: ActionResult;
+  logoutAction: (formData: FormData) => void;
+};
+
+function ModerationPanel({
+  isAdmin,
+  moderationEnabled,
+  loginState,
+  loginAction,
+  logoutState,
+  logoutAction,
+}: ModerationPanelProps) {
+  if (!moderationEnabled) {
+    return (
+      <div className="rounded-3xl border border-amber-200/20 bg-amber-500/5 p-6 text-xs text-amber-100/80">
+        <p>
+          Configura la variable <code>MODERATION_SECRET</code> en tu servidor para habilitar las herramientas de moderación.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-3xl border border-amber-200/40 bg-amber-500/10 p-6 text-sm text-amber-100">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="font-heading text-xl text-amber-100">Herramientas de moderación</h3>
+        {isAdmin ? <span className="rounded-full border border-amber-200/50 px-3 py-1 text-xs uppercase tracking-[0.3em]">Sesión activa</span> : null}
+      </div>
+      {isAdmin ? (
+        <>
+          <p className="mt-3 text-sm text-amber-100/80">
+            Puedes eliminar publicaciones y comentarios ofensivos desde este navegador.
+          </p>
+          {logoutState?.error ? (
+            <p className="mt-4 rounded-2xl border border-red-200/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+              {logoutState.error}
+            </p>
+          ) : null}
+          {logoutState?.message ? (
+            <p className="mt-4 rounded-2xl border border-emerald-200/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+              {logoutState.message}
+            </p>
+          ) : null}
+          <form action={logoutAction} className="mt-4">
+            <ModerationButton label="Cerrar sesión de moderación" pendingLabel="Cerrando..." />
+          </form>
+        </>
+      ) : (
+        <>
+          <p className="mt-3 text-sm text-amber-100/80">
+            Si formas parte del equipo de moderación ingresa la clave para administrar el contenido.
+          </p>
+          {loginState?.error ? (
+            <p className="mt-4 rounded-2xl border border-red-200/40 bg-red-500/10 px-3 py-2 text-xs text-red-100">
+              {loginState.error}
+            </p>
+          ) : null}
+          {loginState?.message ? (
+            <p className="mt-4 rounded-2xl border border-emerald-200/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
+              {loginState.message}
+            </p>
+          ) : null}
+          <form
+            action={loginAction}
+            className="mt-4 flex flex-col gap-3 md:flex-row md:items-center"
+          >
+            <label className="sr-only" htmlFor="moderation-secret">
+              Clave de moderación
+            </label>
+            <input
+              id="moderation-secret"
+              name="secret"
+              type="password"
+              required
+              className="w-full rounded-2xl border border-amber-200/40 bg-white/80 px-4 py-2 text-sm text-slate-900 shadow-inner shadow-amber-900/10 focus:border-amber-300 focus:outline-none focus:ring-2 focus:ring-amber-200 md:max-w-xs"
+              placeholder="Clave de moderación"
+            />
+            <ModerationButton label="Iniciar sesión" pendingLabel="Validando..." />
+          </form>
+        </>
+      )}
+    </div>
+  );
+}
+
+
+function ModerationButton({ label, pendingLabel }: { label: string; pendingLabel: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button
+      type="submit"
+      disabled={pending}
+      className="inline-flex items-center justify-center rounded-full bg-amber-400/90 px-5 py-2 text-xs font-semibold uppercase tracking-[0.3em] text-slate-900 shadow-lg shadow-amber-500/30 transition hover:bg-amber-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-amber-500 disabled:cursor-not-allowed disabled:opacity-70"
+    >
+      {pending ? pendingLabel : label}
+    </button>
   );
 }
 
@@ -279,7 +409,7 @@ function CommentItem({ slug, comment }: { slug: string; comment: CommentNode }) 
         {deleteState?.error ? (
           <span className="rounded-full border border-red-200/40 bg-red-500/10 px-3 py-1 text-red-100">{deleteState.error}</span>
         ) : null}
-        {comment.canEdit ? (
+        {comment.canModerate ? (
           <form action={deleteAction} className="ml-auto">
             <input type="hidden" name="commentId" value={comment.id} />
             <DeleteButton />
