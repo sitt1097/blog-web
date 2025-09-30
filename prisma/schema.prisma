@@ -26,6 +26,7 @@ model Post {
   publishedAt DateTime? // fecha de publicación
   author      User?     @relation(fields: [authorId], references: [id])
   authorId    String?
+  authorAlias String?   // nombre opcional mostrado públicamente
   tags        TagOnPost[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
