@@ -390,6 +390,7 @@ async function loadPageData({ query, tag, page, sort }: LoaderArgs): Promise<Pag
       } else if (error instanceof Prisma.PrismaClientInitializationError) {
         loadErrorMessage =
           "No se pudo conectar con la base de datos. Verifica que DATABASE_URL sea correcto y que el servicio esté disponible.";
+
       } else if (error instanceof Prisma.PrismaClientValidationError) {
         loadErrorMessage =
           'Tu cliente de Prisma no reconoce las columnas de reacciones. Ejecuta "npx prisma migrate deploy" seguido de "npx prisma generate".';
