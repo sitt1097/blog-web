@@ -51,4 +51,21 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Pasos recomendados
+
+1. **Configura tu base de datos**
+   - Usa una base de datos PostgreSQL con _connection pooling_ (por ejemplo, Vercel Postgres, Neon o Supabase).
+   - Copia dos cadenas de conexión:
+     - `DATABASE_URL`: apunta al _pool_ de conexiones. Se usará en la aplicación en producción.
+     - `DIRECT_URL`: apunta directamente a la base de datos principal. Prisma la utiliza para aplicar migraciones.
+2. **Variables de entorno en Vercel**
+   - En _Project Settings → Environment Variables_ agrega `DATABASE_URL`, `DIRECT_URL` y `MODERATION_SECRET` (si quieres moderación).
+   - Replica estas variables en los entornos `Production`, `Preview` y `Development` según lo necesites.
+3. **Comando de build**
+   - Usa el comando por defecto `npm run build`. Antes de ejecutar `next build`, el script [`scripts/with-migrations.ts`](scripts/with-migrations.ts) aplicará las migraciones de Prisma utilizando la `DIRECT_URL` configurada.
+4. **Deploy**
+   - Haz push a tu rama principal o crea un PR. Vercel detectará el proyecto Next.js automáticamente y ejecutará la build.
+
+> Si `DIRECT_URL` no está configurada, Prisma reutilizará `DATABASE_URL` para ejecutar las migraciones. Sin embargo, para despliegues en Vercel se recomienda definir ambas variables para evitar problemas con el _connection pooling_.
+
+Consulta la [documentación de despliegue de Next.js](https://nextjs.org/docs/app/building-your-application/deploying) para más detalles y buenas prácticas adicionales.
